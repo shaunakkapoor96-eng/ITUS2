@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BTC 5m Oracle v7 — Sakura Console</title>
+  <style>
+    :root{
+      --txt: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.70);
+      --muted2: rgba(255,255,255,0.48);
+      --stroke: rgba(255,255,255,0.14);
+      --good: rgba(55,255,190,0.95);
+      --bad: rgba(255,90,140,0.95);
+      --warn: rgba(255,210,120,0.95);
+      --pink: rgba(255,170,210,0.34);
+      --lilac: rgba(200,170,255,0.25);
+      --sky: rgba(120,210,255,0.18);
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--txt);
+      overflow:hidden;
+      background:
+        radial-gradient(1200px 900px at 18% 10%, var(--pink), transparent 55%),
+        radial-gradient(900px 700px at 82% 18%, var(--sky), transparent 60%),
+        radial-gradient(900px 800px at 30% 88%, var(--lilac), transparent 55%),
+        linear-gradient(180deg, #060610, #09071a 55%, #070514);
+    }
+    .art{ position:fixed; inset:0; pointer-events:none; }
+    .art::before{
+      content:"";
+      position:absolute; inset:-20%;
+      background:
+        conic-gradient(from 210deg at 50% 50%,
+          rgba(255,170,210,0.18),
+          rgba(200,170,255,0.14),
+          rgba(120,210,255,0.10),
+          rgba(255,170,210,0.18));
+      filter: blur(70px) saturate(1.15);
+      opacity:0.55;
+      animation: drift 18s ease-in-out infinite;
+    }
+    .art::after{
+      content:"";
+      position:absolute; inset:0;
+      background-image:
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,0.06), transparent 35%),
+        radial-gradient(circle at 70% 35%, rgba(255,255,255,0.05), transparent 38%),
+        radial-gradient(circle at 55% 80%, rgba(255,255,255,0.04), transparent 45%);
+      opacity:0.45;
+      mix-blend-mode: overlay;
+    }
+    @keyframes drift{
+      0%  { transform: translate3d(0,0,0)    rotate(0deg)  scale(1.02); }
+      50% { transform: translate3d(2%,-1%,0) rotate(12deg) scale(1.08); }
+      100%{ transform: translate3d(0,0,0)    rotate(0deg)  scale(1.02); }
+    }
+    canvas#petals{ position:fixed; inset:0; pointer-events:none; opacity:0.9; }
+    .wrap{
+      position:relative; height:100%;
+      display:flex; flex-direction:column; gap:12px; padding:18px;
+    }
+    .topbar{
+      display:flex; justify-content:space-between; align-items:center;
+      gap:12px; flex-wrap:wrap;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; }
+    .badge{
+      width:36px; height:36px; border-radius:14px;
+      background: linear-gradient(135deg, rgba(255,170,210,0.85), rgba(200,170,255,0.70));
+      box-shadow: 0 0 30px rgba(255,170,210,0.18), 0 0 30px rgba(200,170,255,0.15);
+      display:grid; place-items:center; font-weight:900; color: rgba(10,8,18,0.75);
+    }
+    .brand h1{ margin:0; font-size:16px; letter-spacing:0.3px; }
+    .brand .sub{ margin-top:2px; font-size:12px; color:var(--muted); }
+    .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .pill{
+      border:1px solid var(--stroke);
+      background: rgba(0,0,0,0.18);
+      padding:8px 10px; border-radius:999px;
+      font-size:12px; color:var(--muted);
+      backdrop-filter: blur(10px);
+      white-space:nowrap;
+    }
+    .btn{
+      border:1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      color: var(--txt); padding:10px 12px; border-radius:14px;
+      cursor:pointer; font-weight:800; letter-spacing:0.2px;
+      backdrop-filter: blur(12px);
+      transition: transform .08s ease, background .12s ease;
+      user-select:none;
+    }
+    .btn:hover{ background: rgba(255,255,255,0.12); }
+    .btn:active{ transform: scale(0.98); }
+    .grid{
+      display:grid; grid-template-columns: 1.2fr 0.8fr;
+      gap:12px; flex:1; min-height:0;
+    }
+    .card{
+      border:1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(20,18,30,0.38), rgba(20,18,30,0.24));
+      border-radius:22px; padding:14px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.38);
+      min-height:0;
+    }
+    .main{ display:flex; flex-direction:column; gap:12px; min-height:0; }
+    .flowRow{
+      display:grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap:10px;
+    }
+    .flowBox{
+      border-radius:18px; border:1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.22); padding:12px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .flowBox .k{ font-size:11px; color:var(--muted2); margin-bottom:5px; letter-spacing:0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .flowBox .v{ font-size:clamp(13px,1.5vw,20px); font-weight:900; letter-spacing:0.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .openBox{ position:relative; }
+    .openBox .k{ display:flex; align-items:center; justify-content:space-between; }
+    .edit-btn{
+      font-size:10px; font-weight:700; letter-spacing:0.5px;
+      color:var(--muted2); background:rgba(255,255,255,0.07);
+      border:1px solid rgba(255,255,255,0.14); border-radius:6px;
+      padding:1px 6px; cursor:pointer; transition:all .15s;
+      white-space:nowrap; flex-shrink:0;
+    }
+    .edit-btn:hover{ color:var(--txt); background:rgba(255,255,255,0.13); }
+    .edit-btn.active{ color:var(--warn); border-color:rgba(255,210,120,0.4); background:rgba(255,210,120,0.08); }
+    .override-row{
+      display:none; align-items:center; gap:6px; margin-top:6px;
+    }
+    .override-row.visible{ display:flex; }
+    .override-input{
+      flex:1; min-width:0;
+      background: rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.2);
+      color:var(--txt); font-family:inherit; font-size:13px; font-weight:700;
+      padding:4px 8px; border-radius:8px; outline:none;
+      transition:border-color .15s;
+    }
+    .override-input:focus{ border-color:rgba(255,210,120,0.55); }
+    .override-set{
+      font-size:11px; font-weight:800; padding:4px 9px; border-radius:8px;
+      background:rgba(255,210,120,0.15); border:1px solid rgba(255,210,120,0.35);
+      color:var(--warn); cursor:pointer; white-space:nowrap; transition:all .15s;
+    }
+    .override-set:hover{ background:rgba(255,210,120,0.25); }
+    .override-clear{
+      font-size:11px; font-weight:700; padding:4px 7px; border-radius:8px;
+      background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14);
+      color:var(--muted2); cursor:pointer; transition:all .15s;
+    }
+    .override-clear:hover{ color:var(--bad); border-color:rgba(255,90,140,0.35); }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .decisionPanel{
+      border-radius:22px; border:1px solid rgba(255,255,255,0.14);
+      background:
+        radial-gradient(700px 260px at 20% 10%, rgba(255,170,210,0.16), transparent 62%),
+        radial-gradient(650px 280px at 90% 20%, rgba(200,170,255,0.14), transparent 65%),
+        rgba(0,0,0,0.22);
+      padding:16px;
+      display:flex; align-items:flex-start; justify-content:space-between;
+      gap:14px; flex-wrap:wrap;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+      transition: box-shadow 0.5s;
+    }
+    .decisionPanel.active-up{
+      box-shadow: inset 0 0 0 1.5px rgba(55,255,190,0.45), 0 0 50px rgba(55,255,190,0.10);
+    }
+    .decisionPanel.active-down{
+      box-shadow: inset 0 0 0 1.5px rgba(255,90,140,0.45), 0 0 50px rgba(255,90,140,0.10);
+    }
+    .decisionPanel.active-now{
+      box-shadow: inset 0 0 0 2px rgba(55,255,190,0.65), 0 0 70px rgba(55,255,190,0.18);
+      animation: glow-pulse 0.9s ease-in-out infinite alternate;
+    }
+    @keyframes glow-pulse{
+      from{ box-shadow: inset 0 0 0 2px rgba(55,255,190,0.45), 0 0 40px rgba(55,255,190,0.10); }
+      to  { box-shadow: inset 0 0 0 2px rgba(55,255,190,0.75), 0 0 80px rgba(55,255,190,0.22); }
+    }
+    .decisionBig{
+      font-size:28px; font-weight:950; letter-spacing:0.7px;
+      line-height:1.1; margin-bottom:8px;
+      transition: color 0.3s;
+    }
+    .decisionMeta{
+      display:flex; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--muted);
+    }
+    .tag{
+      display:inline-block;
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      border-radius:999px; padding:4px 9px; white-space:nowrap;
+    }
+    .tag.good{ color:var(--good); border-color:rgba(55,255,190,0.26); }
+    .tag.bad { color:var(--bad);  border-color:rgba(255,90,140,0.26); }
+    .tag.warn{ color:var(--warn); border-color:rgba(255,210,120,0.26); }
+    .tag.now {
+      color:var(--good); border-color:rgba(55,255,190,0.5);
+      background:rgba(55,255,190,0.10);
+      animation: blink-now 0.7s ease-in-out infinite alternate;
+    }
+    @keyframes blink-now{
+      from{ background:rgba(55,255,190,0.06); }
+      to  { background:rgba(55,255,190,0.20); }
+    }
+    .rightStats{
+      min-width:280px; display:flex; flex-direction:column; gap:6px;
+    }
+    .statRow{
+      display:flex; justify-content:space-between; gap:12px;
+      font-size:12px; color:var(--muted);
+    }
+    .statRow strong{ color:var(--txt); font-weight:900; }
+    .tiles{
+      display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px;
+    }
+    .tile{
+      border-radius:18px; border:1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.22); padding:12px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+      transition: border-color 0.3s;
+    }
+    .tile.gate-triggered{ border-color:rgba(255,210,120,0.40); background:rgba(255,210,120,0.04); }
+    .tile.gate-ok        { border-color:rgba(55,255,190,0.22); }
+    .tile .k{ font-size:12px; color:var(--muted2); margin-bottom:6px; }
+    .tile .v{ font-size:18px; font-weight:900; letter-spacing:0.3px; }
+    .tile .s{ font-size:11px; color:var(--muted); margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .side{ display:flex; flex-direction:column; gap:10px; min-height:0; }
+    .side h2{ margin:0; font-size:13px; color:var(--muted); letter-spacing:0.3px; }
+    .statsBox{
+      border-radius:18px; border:1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.22); padding:12px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .statsRow{
+      display:flex; justify-content:space-between; gap:12px;
+      font-size:12px; color:var(--muted); margin:5px 0;
+    }
+    .statsRow strong{ color:var(--txt); font-weight:900; }
+    table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; color:var(--muted); }
+    th,td{ text-align:left; padding:5px 4px; border-bottom:1px solid rgba(255,255,255,0.09); white-space:nowrap; }
+    th{ color:rgba(255,255,255,0.78); font-weight:900; }
+    .log{
+      flex:1; min-height:0; border-radius:16px;
+      border:1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.28);
+      padding:10px; font-size:12px; color:rgba(255,255,255,0.78);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      overflow:auto; white-space:pre-wrap; line-height:1.35;
+    }
+    .note{ font-size:12px; color:var(--muted2); line-height:1.35; }
+    @media(max-width:980px){
+      .grid{ grid-template-columns:1fr; }
+      .flowRow{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .tiles{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .decisionBig{ font-size:22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="art"></div>
+  <canvas id="petals"></canvas>
+
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="badge">🌸</div>
+        <div>
+          <h1>BTC 5m Oracle v7</h1>
+          <div class="sub">Sakura Console · confidence bands · band win/loss tracking · fast feed</div>
+        </div>
+      </div>
+      <div class="controls">
+        <span class="pill" id="feedPill">FEED: connecting…</span>
+        <span class="pill" id="wsPill">WS: —</span>
+        <span class="pill" id="candlePill">CANDLE: —</span>
+        <button class="btn" id="toggleBtn">Start</button>
+        <button class="btn" id="resetBtn" title="Reset all stats">Reset Stats</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card main">
+        <div class="flowRow">
+          <div class="flowBox openBox">
+            <div class="k">
+              <span>Price to beat (Open)</span>
+              <button class="edit-btn" id="editOpenBtn" title="Override open price">EDIT</button>
+            </div>
+            <div class="v mono" id="openVal">—</div>
+            <div class="override-row" id="overrideRow">
+              <input class="override-input mono" id="overrideInput" type="number" step="0.01" placeholder="e.g. 97450.50"/>
+              <button class="override-set" id="overrideSetBtn">SET</button>
+              <button class="override-clear" id="overrideClearBtn">✕</button>
+            </div>
+          </div>
+          <div class="flowBox">
+            <div class="k">Current price</div>
+            <div class="v mono" id="priceVal">—</div>
+          </div>
+          <div class="flowBox">
+            <div class="k">Delta vs open</div>
+            <div class="v mono" id="deltaVal">—</div>
+          </div>
+          <div class="flowBox">
+            <div class="k">Time left</div>
+            <div class="v mono" id="timeLeftVal">—</div>
+          </div>
+          <div class="flowBox">
+            <div class="k">Confidence</div>
+            <div class="v mono" id="confFlowVal">—</div>
+          </div>
+          <div class="flowBox">
+            <div class="k">Band</div>
+            <div class="v mono" id="bandFlowVal">—</div>
+          </div>
+        </div>
+
+        <div class="decisionPanel" id="decisionPanel">
+          <div>
+            <div class="decisionBig" id="decisionBig">WARMING UP — NO BET</div>
+            <div class="decisionMeta">
+              <span class="tag warn"  id="bandTag">BAND: —</span>
+              <span class="tag"       id="phaseTag">PHASE: —</span>
+              <span class="tag"       id="gatesTag">GATES: —</span>
+              <span class="tag"       id="whenTag">WHEN: —</span>
+              <span class="tag"       id="evalTag">EVAL: —</span>
+            </div>
+          </div>
+          <div class="rightStats">
+            <div class="statRow"><span>ATR5 (12 candles)</span><strong class="mono" id="atrVal">—</strong></div>
+            <div class="statRow"><span>z-score</span><strong class="mono" id="zVal">—</strong></div>
+            <div class="statRow"><span>S → pUp</span><strong class="mono" id="pVal">—</strong></div>
+            <div class="statRow"><span>Confidence</span><strong class="mono" id="confVal">—</strong></div>
+          </div>
+        </div>
+
+        <div class="tiles">
+          <div class="tile" id="tileMom">
+            <div class="k">Momentum</div>
+            <div class="v" id="momV">—</div>
+            <div class="s" id="momS">m15 / m60 / m180</div>
+          </div>
+          <div class="tile" id="tileCross">
+            <div class="k">Crosses vs Open</div>
+            <div class="v" id="crossV">—</div>
+            <div class="s" id="crossS">Gate D — ≥2 triggers</div>
+          </div>
+          <div class="tile" id="tileRange">
+            <div class="k">Range60 / ATR</div>
+            <div class="v" id="rngV">—</div>
+            <div class="s" id="rngS">Gate C — &lt;20% ATR triggers</div>
+          </div>
+          <div class="tile" id="tileWin">
+            <div class="k">Lock + Window</div>
+            <div class="v" id="winV">—</div>
+            <div class="s">Lock@60s · Bet 70–130s · Late&gt;180s</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card side">
+        <h2>Performance</h2>
+        <div class="statsBox">
+          <div class="statsRow"><span>Total candles seen</span><strong class="mono" id="cTot">—</strong></div>
+          <div class="statsRow"><span>No-bet candles</span><strong class="mono" id="cNoBet">—</strong></div>
+          <div class="statsRow"><span>No-bet rate</span><strong class="mono" id="cNoBetRate">—</strong></div>
+          <div style="height:8px"></div>
+          <div class="statsRow"><span>Bets signaled</span><strong class="mono" id="gTot">—</strong></div>
+          <div class="statsRow"><span>Wins</span><strong class="mono" id="gWin">—</strong></div>
+          <div class="statsRow"><span>Global win rate</span><strong class="mono" id="gWr">—</strong></div>
+          <table>
+            <thead><tr><th>Band</th><th>Bets</th><th>Wins</th><th>Win%</th></tr></thead>
+            <tbody>
+              <tr><td>65–74% (HALF)</td>  <td class="mono" id="b1Tot">—</td><td class="mono" id="b1Win">—</td><td class="mono" id="b1Wr">—</td></tr>
+              <tr><td>75–89% (FULL)</td>  <td class="mono" id="b2Tot">—</td><td class="mono" id="b2Win">—</td><td class="mono" id="b2Wr">—</td></tr>
+              <tr><td>90%+  (DOUBLE)</td> <td class="mono" id="b3Tot">—</td><td class="mono" id="b3Win">—</td><td class="mono" id="b3Wr">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h2>Activity Log</h2>
+        <div class="log" id="log"></div>
+        <div class="note">
+          Coinbase WS ticker (REST fallback). Polymarket resolves via Chainlink — same direction applies.<br/>
+          OBI/CVD = 0 in browser mode. Stats saved to localStorage.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════
+  //  ORACLE v7 CONSTANTS
+  // ═══════════════════════════════════════════════════════
+  const LOCK_MS        = 60_000;
+  const EXEC_START_MS  = 70_000;
+  const EXEC_END_MS    = 130_000;
+  const LATE_CUTOFF_MS = 180_000;
+  const STALE_MS       = 5_000;
+  const NEED_ATR       = 12;
+  const ATR_C_FACTOR   = 0.20;
+  const EXHAUST_Z      = 1.6;
+  // Gate F: fires when |z|>1.6 at lock time (T0+60s), AND lock happened before T0+120s.
+  // Since we always lock at T0+60s, the time condition is always true.
+  // We keep the semantic check for clarity: elapsed at lock < EXHAUST_TIME_MS
+  const EXHAUST_TIME_MS = 120_000;
+  const MAX_CROSSES    = 2;
+  const CONF_HALF      = 0.65;
+  const CONF_FULL      = 0.75;
+  const CONF_DOUBLE    = 0.90;
+  const SC_M15  = 0.05;
+  const SC_M60  = 0.10;
+  const SC_M180 = 0.25;
+  const W_Z=2.5, W_M60=1.8, W_M15=1.2, W_M180=0.8, W_ACCEL=1.0, W_OBI=1.2, W_CVD=1.4;
+  const OBI=0, CVDN=0, CVD_RATE=0;   // browser-only: neutral microstructure
+
+  // ═══════════════════════════════════════════════════════
+  //  STATS PERSISTENCE
+  // ═══════════════════════════════════════════════════════
+  const STATS_KEY = 'oracle_v7_stats_v2';
+  function emptyStats(){
+    return {
+      candles: { total:0, nobet:0 },
+      global:  { bets:0, wins:0 },
+      band: { b1:{bets:0,wins:0}, b2:{bets:0,wins:0}, b3:{bets:0,wins:0} }
+    };
+  }
+  function loadStats(){
+    try{
+      const r = localStorage.getItem(STATS_KEY);
+      if(!r) return emptyStats();
+      const o = JSON.parse(r);
+      if(!o?.global||!o?.band||!o?.candles) return emptyStats();
+      return o;
+    }catch{ return emptyStats(); }
+  }
+  function saveStats(){ localStorage.setItem(STATS_KEY, JSON.stringify(stats)); }
+  function pct(w,t){ return t>0 ? (100*w/t).toFixed(1)+'%' : '—'; }
+
+  let stats = loadStats();
+
+  // ═══════════════════════════════════════════════════════
+  //  RUNTIME STATE
+  // ═══════════════════════════════════════════════════════
+  let running     = false;
+  let lastPrice   = null;
+  let lastPriceMs = 0;
+  let ws          = null;
+  let wsHealthy   = false;
+  let wsLastMsgMs = 0;
+  let samples     = [];   // [{t,p}]  rolling 90-min
+  let completed   = [];   // [{startMs,high,low}]  last 20
+  let candle      = null;
+  let openOverride = null; // manually set open price
+  let lastSampleInsertMs = 0;
+  const MIN_SAMPLE_GAP = 250;
+
+  // ═══════════════════════════════════════════════════════
+  //  DOM REFS
+  // ═══════════════════════════════════════════════════════
+  const $ = id => document.getElementById(id);
+  const feedPill    = $('feedPill');
+  const wsPill      = $('wsPill');
+  const candlePill  = $('candlePill');
+  const toggleBtn   = $('toggleBtn');
+  const logEl       = $('log');
+  const decisionPanel = $('decisionPanel');
+  const decisionBig   = $('decisionBig');
+  const bandTag  = $('bandTag');
+  const phaseTag = $('phaseTag');
+  const gatesTag = $('gatesTag');
+  const whenTag  = $('whenTag');
+  const evalTag  = $('evalTag');
+
+  // ═══════════════════════════════════════════════════════
+  //  OPEN OVERRIDE UI
+  // ═══════════════════════════════════════════════════════
+  const editOpenBtn    = $('editOpenBtn');
+  const overrideRow    = $('overrideRow');
+  const overrideInput  = $('overrideInput');
+  const overrideSetBtn = $('overrideSetBtn');
+  const overrideClearBtn=$('overrideClearBtn');
+
+  editOpenBtn.addEventListener('click',()=>{
+    const visible = overrideRow.classList.toggle('visible');
+    editOpenBtn.classList.toggle('active', visible);
+    if(visible){
+      overrideInput.value = openOverride ?? (candle?.open?.toFixed(2) ?? '');
+      overrideInput.focus();
+      overrideInput.select();
+    }
+  });
+
+  overrideSetBtn.addEventListener('click', applyOverride);
+  overrideInput.addEventListener('keydown', e=>{ if(e.key==='Enter') applyOverride(); if(e.key==='Escape') clearOverride(); });
+
+  function applyOverride(){
+    const v = parseFloat(overrideInput.value);
+    if(!Number.isFinite(v)||v<=0){ overrideInput.focus(); return; }
+    openOverride = v;
+    if(candle){ candle.open = v; }
+    overrideRow.classList.remove('visible');
+    editOpenBtn.classList.remove('active');
+    editOpenBtn.textContent = 'EDIT ✓';
+    editOpenBtn.style.color = 'var(--warn)';
+    log('OPEN OVERRIDE set to '+v.toFixed(2));
+    render();
+  }
+
+  overrideClearBtn.addEventListener('click', clearOverride);
+  function clearOverride(){
+    openOverride = null;
+    overrideInput.value='';
+    overrideRow.classList.remove('visible');
+    editOpenBtn.classList.remove('active');
+    editOpenBtn.textContent='EDIT';
+    editOpenBtn.style.color='';
+    log('OPEN OVERRIDE cleared — using feed price');
+    render();
+  }
+  function clamp(x,a,b){ return Math.max(a,Math.min(b,x)); }
+  function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+  function signOf(x){ return x>0?1:x<0?-1:0; }
+
+  function candleWindowUtc(ms){
+    const min   = Math.floor(ms/60000);
+    const start = (min-(min%5))*60000;
+    return { startMs:start, endMs:start+300000 };
+  }
+
+  function priceAtOrBefore(targetMs){
+    for(let i=samples.length-1;i>=0;i--)
+      if(samples[i].t<=targetMs) return samples[i].p;
+    return null;
+  }
+
+  function prune(){
+    const cutoff = Date.now()-90*60*1000;
+    while(samples.length && samples[0].t<cutoff) samples.shift();
+    while(completed.length>20) completed.shift();
+  }
+
+  function log(line){
+    const ts = new Date().toISOString().slice(11,19);
+    logEl.textContent = '['+ts+'] '+line+'\n'+logEl.textContent;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  ATR
+  // ═══════════════════════════════════════════════════════
+  function atr5(){
+    if(completed.length<NEED_ATR) return null;
+    const s = completed.slice(-NEED_ATR).reduce((a,c)=>a+(c.high-c.low),0);
+    const avg = s/NEED_ATR;
+    return avg>0?avg:null;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  BAND HELPERS
+  // ═══════════════════════════════════════════════════════
+  function bandFromConf(conf){
+    if(conf==null||conf<CONF_HALF) return {label:'<65', key:null,  size:'NO BET'};
+    if(conf<CONF_FULL)             return {label:'65–74', key:'b1', size:'HALF'};
+    if(conf<CONF_DOUBLE)           return {label:'75–89', key:'b2', size:'FULL'};
+    return                                {label:'90+',   key:'b3', size:'DOUBLE'};
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  CANDLE LIFECYCLE
+  // ═══════════════════════════════════════════════════════
+  function ensureCandle(){
+    if(lastPrice==null) return;
+    const now = Date.now();
+    const {startMs,endMs} = candleWindowUtc(now);
+
+    if(!candle || candle.startMs!==startMs){
+      if(candle) finalizeCandleIfNeeded(true);
+      // Reset override UI for new candle
+      openOverride = null;
+      editOpenBtn.textContent='EDIT';
+      editOpenBtn.style.color='';
+      editOpenBtn.classList.remove('active');
+      overrideRow.classList.remove('visible');
+      candle = {
+        startMs, endMs,
+        open:null, high:-Infinity, low:Infinity, close:null,
+        locked:false,
+        lockP:null, lockS:null, lockConf:null,
+        lockAction:'NO BET', lockReason:'—',
+        crosses:0, signPrev:0,
+        range60:0, range60Computed:false,
+        finalized:false
+      };
+      log('NEW CANDLE  '+new Date(startMs).toISOString().slice(11,16)+
+          '–'+new Date(endMs).toISOString().slice(11,16)+' UTC');
+    }
+
+    if(candle.open==null && lastPriceMs>=candle.startMs){
+      candle.open = openOverride ?? lastPrice;
+      candle.signPrev = 0;
+      log('OPEN = '+candle.open.toFixed(2)+(openOverride?' [OVERRIDE]':' [feed]'));
+    }
+    // Apply override mid-candle if user just set it
+    if(openOverride!=null && candle.open !== openOverride && !candle.locked){
+      candle.open = openOverride;
+    }
+
+    candle.high  = Math.max(candle.high,  lastPrice);
+    candle.low   = Math.min(candle.low,   lastPrice);
+    candle.close = lastPrice;
+
+    // Crossings before lock
+    if(candle.open!=null && now<candle.startMs+LOCK_MS){
+      const s = signOf(lastPrice-candle.open);
+      if(s!==0 && candle.signPrev!==0 && s!==candle.signPrev) candle.crosses++;
+      if(s!==0) candle.signPrev=s;
+    }
+
+    // Range60 — compute once after 60s have passed
+    if(!candle.range60Computed && now>=candle.startMs+60_000){
+      let hi=-Infinity, lo=Infinity, n=0;
+      for(let i=samples.length-1;i>=0;i--){
+        const {t,p}=samples[i];
+        if(t<candle.startMs) break;
+        if(t<=candle.startMs+60_000){ hi=Math.max(hi,p); lo=Math.min(lo,p); n++; }
+      }
+      candle.range60=(n>=2)?(hi-lo):0;
+      candle.range60Computed=true;
+    }
+
+    prune();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  LOCK DECISION
+  // ═══════════════════════════════════════════════════════
+  function lockDecisionIfReady(){
+    const now = Date.now();
+    if(!candle||candle.locked||now<candle.startMs+LOCK_MS) return;
+
+    const stale = (now-lastPriceMs>STALE_MS);
+    if(stale){
+      seal('NO BET','Gate A: FEED STALE'); return;
+    }
+    if(candle.open==null && now>candle.startMs+10_000){
+      seal('NO BET','Gate B: OPEN MISSING'); return;
+    }
+
+    const ATR = atr5();
+    if(ATR==null){
+      seal('NO BET','WARMING UP: need '+NEED_ATR+' completed candles'); return;
+    }
+
+    const range60 = candle.range60Computed ? candle.range60 : 0;
+    if(range60 < ATR_C_FACTOR*ATR){
+      seal('NO BET','Gate C: LOW VOL CHOP',0.5,0,0.5); return;
+    }
+
+    if(candle.crosses>=MAX_CROSSES){
+      seal('NO BET','Gate D: OPEN CROSSES '+candle.crosses); return;
+    }
+
+    const Tlock = candle.startMs+LOCK_MS;
+    const pLock = priceAtOrBefore(Tlock);
+    const p15   = priceAtOrBefore(Tlock-15_000);
+    const p60   = priceAtOrBefore(Tlock-60_000);
+    const p180  = priceAtOrBefore(Tlock-180_000);
+
+    if(!pLock||!p15||!p60||!p180||candle.open==null){
+      seal('NO BET','Gate H: MISSING LOOKBACKS'); return;
+    }
+
+    const z    = (pLock-candle.open)/ATR;
+    const m15  = 100*(pLock/p15 -1);
+    const m60  = 100*(pLock/p60 -1);
+    const m180 = 100*(pLock/p180-1);
+    const m15n  = clamp(m15 /SC_M15,  -1,1);
+    const m60n  = clamp(m60 /SC_M60,  -1,1);
+    const m180n = clamp(m180/SC_M180, -1,1);
+    const accel = clamp(m15n-(m60n/2), -1,1);
+
+    // Gate F: exhaustion spike at lock (lock always at T0+60s < T0+120s, so time condition
+    // is permanently satisfied — effectively just abs(z) > EXHAUST_Z)
+    const elapsedAtLock = LOCK_MS; // always 60s
+    if(Math.abs(z)>EXHAUST_Z && elapsedAtLock<EXHAUST_TIME_MS){
+      seal('NO BET','Gate F: EXHAUSTION z='+z.toFixed(2),0.5,0,0.5); return;
+    }
+
+    // Gate G: conflict between z and m60 direction (cvd=0 so neutral)
+    const dirs = [signOf(z), signOf(m60), signOf(CVD_RATE)].filter(d=>d!==0);
+    if(dirs.includes(1)&&dirs.includes(-1)){
+      seal('NO BET','Gate G: SIGNAL CONFLICT'); return;
+    }
+
+    const S = W_Z*z + W_M60*m60n + W_M15*m15n + W_M180*m180n +
+              W_ACCEL*accel + W_OBI*OBI + W_CVD*CVDN;
+    const pUp  = clamp(sigmoid(S), 0.02, 0.98);
+    const conf = Math.max(pUp,1-pUp);
+    const band = bandFromConf(conf);
+
+    let action = 'NO BET';
+    if(band.key) action = (pUp>0.5?'BET UP':'BET DOWN')+' — '+band.size;
+
+    seal(action,'LOCKED @60s',pUp,S,conf);
+    log('LOCK  conf='+( conf*100).toFixed(1)+'%  '+action);
+  }
+
+  function seal(action,reason,pUp=null,S=null,conf=null){
+    candle.locked     = true;
+    candle.lockAction = action;
+    candle.lockReason = reason;
+    candle.lockP      = pUp;
+    candle.lockS      = S;
+    candle.lockConf   = conf;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  FINALIZE (runs once per candle at end)
+  // ═══════════════════════════════════════════════════════
+  function finalizeCandleIfNeeded(force=false){
+    if(!candle||candle.finalized) return;
+    const now = Date.now();
+    if(!force && now<candle.endMs) return;
+
+    if(Number.isFinite(candle.high)&&Number.isFinite(candle.low)){
+      completed.push({startMs:candle.startMs,high:candle.high,low:candle.low});
+    }
+
+    stats.candles.total++;
+
+    const band = bandFromConf(candle.lockConf);
+    const signaledBet = !!band.key && candle.lockAction.startsWith('BET ');
+
+    if(!signaledBet){
+      stats.candles.nobet++;
+      evalTag.textContent = 'EVAL: NO BET';
+    } else if(candle.open==null||candle.close==null){
+      stats.candles.nobet++;
+      evalTag.textContent = 'EVAL: NO BET (data)';
+    } else {
+      const actual    = (candle.close>=candle.open)?'UP':'DOWN';
+      const predicted = (candle.lockP!=null&&candle.lockP>0.5)?'UP':'DOWN';
+      const win = predicted===actual;
+      stats.global.bets++;
+      if(win) stats.global.wins++;
+      if(band.key){
+        stats.band[band.key].bets++;
+        if(win) stats.band[band.key].wins++;
+      }
+      evalTag.textContent = 'EVAL: '+(win?'WIN ✓':'LOSS ✗')+' (actual '+actual+')';
+      evalTag.className   = 'tag '+(win?'good':'bad');
+      log('RESULT  '+predicted+' vs actual '+actual+'  → '+(win?'WIN':'LOSS')+' ['+band.label+']');
+    }
+
+    saveStats();
+    updatePerfUI();
+    candle.finalized = true;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  PERF UI
+  // ═══════════════════════════════════════════════════════
+  function updatePerfUI(){
+    $('cTot').textContent      = stats.candles.total;
+    $('cNoBet').textContent    = stats.candles.nobet;
+    $('cNoBetRate').textContent= pct(stats.candles.nobet,stats.candles.total);
+    $('gTot').textContent      = stats.global.bets;
+    $('gWin').textContent      = stats.global.wins;
+    $('gWr').textContent       = pct(stats.global.wins,stats.global.bets);
+    ['b1','b2','b3'].forEach(k=>{
+      const b=stats.band[k];
+      $(k+'Tot').textContent=b.bets;
+      $(k+'Win').textContent=b.wins;
+      $(k+'Wr').textContent =pct(b.wins,b.bets);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  RENDER LOOP
+  // ═══════════════════════════════════════════════════════
+  function render(){
+    const now = Date.now();
+    ensureCandle();
+    if(!candle) return;
+
+    const stale = (now-lastPriceMs>STALE_MS);
+
+    // Feed pill
+    feedPill.textContent   = stale?'FEED: stale':'FEED: ok';
+    feedPill.style.color   = stale?'var(--warn)':'var(--good)';
+    feedPill.style.borderColor = stale?'rgba(255,210,120,0.35)':'rgba(55,255,190,0.26)';
+
+    // WS pill
+    const wsAge = now-wsLastMsgMs;
+    const wsOk  = wsHealthy && wsAge<3000;
+    wsPill.textContent     = 'WS: '+(wsOk?'ok':'—')+' ('+wsAge+'ms)';
+    wsPill.style.color     = wsOk?'var(--good)':'var(--warn)';
+    wsPill.style.borderColor=wsOk?'rgba(55,255,190,0.26)':'rgba(255,210,120,0.35)';
+
+    const elapsed = Math.max(0,Math.floor((now-candle.startMs)/1000));
+    const left    = Math.max(0,Math.floor((candle.endMs-now)/1000));
+    candlePill.textContent = 'CANDLE: '+elapsed+'s / '+left+'s';
+
+    // Flow row
+    $('openVal').textContent  = candle.open!=null
+      ? candle.open.toFixed(2)+(openOverride!=null?' ⬦':'')
+      : '—';
+    $('priceVal').textContent = lastPrice!=null   ? lastPrice.toFixed(2)   : '—';
+    $('timeLeftVal').textContent = left+'s';
+
+    if(candle.open!=null&&lastPrice!=null){
+      const d=lastPrice-candle.open;
+      $('deltaVal').textContent = (d>=0?'+':'−')+Math.abs(d).toFixed(2);
+      $('deltaVal').style.color = d>=0?'var(--good)':'var(--bad)';
+    } else {
+      $('deltaVal').textContent='—';
+      $('deltaVal').style.color='var(--txt)';
+    }
+
+    // Lock + finalize
+    lockDecisionIfReady();
+    finalizeCandleIfNeeded();
+
+    const ATR = atr5();
+    $('atrVal').textContent = ATR!=null?ATR.toFixed(2):'—';
+
+    // Live momentum
+    const pNow = priceAtOrBefore(now);
+    const p15  = priceAtOrBefore(now-15_000);
+    const p60  = priceAtOrBefore(now-60_000);
+    const p180 = priceAtOrBefore(now-180_000);
+
+    const m15  = (pNow&&p15) ?(100*(pNow/p15 -1)):null;
+    const m60  = (pNow&&p60) ?(100*(pNow/p60 -1)):null;
+    const m180 = (pNow&&p180)?(100*(pNow/p180-1)):null;
+
+    $('momV').textContent = (m15!=null&&m60!=null)?m15.toFixed(3)+'% / '+m60.toFixed(3)+'%':'—';
+    $('momS').textContent = 'm15='+(m15!=null?m15.toFixed(3):'—')+'%  m60='+(m60!=null?m60.toFixed(3):'—')+'%  m180='+(m180!=null?m180.toFixed(3):'—')+'%';
+
+    // Gate D tile
+    const crossTriggered = candle.crosses>=MAX_CROSSES;
+    $('crossV').textContent = candle.crosses+'';
+    $('crossS').textContent = crossTriggered?'Gate D TRIGGERED':'Gate D OK';
+    document.getElementById('tileCross').className = 'tile '+(crossTriggered?'gate-triggered':'gate-ok');
+
+    // Gate C tile
+    const range60       = candle.range60Computed?candle.range60:0;
+    const chopTriggered = ATR!=null&&candle.range60Computed&&range60<ATR_C_FACTOR*ATR;
+    $('rngV').textContent = ATR!=null?range60.toFixed(2)+' / '+ATR.toFixed(2):'—';
+    $('rngS').textContent = chopTriggered?'Gate C TRIGGERED':'Gate C OK';
+    document.getElementById('tileRange').className='tile '+(chopTriggered?'gate-triggered':'gate-ok');
+
+    // z live
+    const zLive = (ATR&&candle.open!=null&&lastPrice!=null)?((lastPrice-candle.open)/ATR):null;
+    $('zVal').textContent = zLive!=null?zLive.toFixed(3):'—';
+
+    // Live score preview (pre-lock) or locked value
+    let dispPUp=null, dispS=null, dispConf=null;
+    if(candle.locked){
+      dispPUp=candle.lockP; dispS=candle.lockS; dispConf=candle.lockConf;
+    } else if(!stale&&ATR&&candle.open!=null&&pNow&&p15&&p60&&p180){
+      const z_   = (pNow-candle.open)/ATR;
+      const m15n = clamp((100*(pNow/p15 -1))/SC_M15,  -1,1);
+      const m60n = clamp((100*(pNow/p60 -1))/SC_M60,  -1,1);
+      const m180n= clamp((100*(pNow/p180-1))/SC_M180, -1,1);
+      const acc  = clamp(m15n-(m60n/2),-1,1);
+      const S_   = W_Z*z_+W_M60*m60n+W_M15*m15n+W_M180*m180n+W_ACCEL*acc+W_OBI*OBI+W_CVD*CVDN;
+      const pUp_ = clamp(sigmoid(S_),0.02,0.98);
+      dispPUp=pUp_; dispS=S_; dispConf=Math.max(pUp_,1-pUp_);
+    }
+
+    $('pVal').textContent    = (dispS!=null&&dispPUp!=null)?dispS.toFixed(3)+' → '+(dispPUp*100).toFixed(1)+'%':'—';
+    $('confVal').textContent = dispConf!=null?(dispConf*100).toFixed(1)+'%':'—';
+
+    const b_ = bandFromConf(dispConf);
+    $('confFlowVal').textContent = dispConf!=null?(dispConf*100).toFixed(1)+'%':'—';
+    $('bandFlowVal').textContent = b_.label;
+
+    // Phase
+    const t   = now-candle.startMs;
+    const ph  = t<LOCK_MS?'SCOUTING':t<EXEC_START_MS?'LOCKED':t<=EXEC_END_MS?'BET WINDOW':t<=LATE_CUTOFF_MS?'POST WINDOW':'LATE';
+    phaseTag.textContent = 'PHASE: '+ph;
+
+    // Gates list
+    const gates=[];
+    if(stale) gates.push('A');
+    if(candle.open==null&&now>candle.startMs+10_000) gates.push('B');
+    if(chopTriggered) gates.push('C');
+    if(crossTriggered) gates.push('D');
+    if(t>LATE_CUTOFF_MS) gates.push('E');
+    if(candle.lockReason.includes('EXHAUST')) gates.push('F');
+    if(candle.lockReason.includes('CONFLICT')) gates.push('G');
+    if(candle.lockReason.includes('WARMING')) gates.push('ATR');
+    if(candle.lockReason.includes('LOOKBACK')) gates.push('H');
+    gatesTag.textContent = 'GATES: '+(gates.length?gates.join(','):'none');
+
+    // Big decision text
+    let actionText='SCOUTING — NO BET';
+    decisionPanel.className='decisionPanel';
+
+    if(!candle.locked){
+      if(ATR==null)       actionText='WARMING UP (ATR) — NO BET';
+      else if(t<LOCK_MS)  actionText='SCOUTING — NO BET  (locks at 60s)';
+      else                actionText='LOCKING…';
+      whenTag.textContent='WHEN: lock@60s · bet 70–130s';
+      bandTag.textContent='BAND: —';
+      bandTag.className  ='tag warn';
+      decisionBig.style.color='var(--txt)';
+    } else {
+      const isBet = candle.lockAction.startsWith('BET ');
+      let final   = candle.lockAction;
+
+      if(isBet && t>=EXEC_START_MS && t<=EXEC_END_MS){
+        final = final+'  •  PLACE BET NOW';
+        whenTag.textContent='WHEN: NOW (70–130s window)';
+        whenTag.className  ='tag now';
+        decisionPanel.className='decisionPanel active-now';
+      } else if(isBet && t>EXEC_END_MS){
+        final='MISSED WINDOW — NO BET';
+        whenTag.textContent='WHEN: missed (past 130s)';
+        whenTag.className  ='tag warn';
+      } else if(t>LATE_CUTOFF_MS){
+        whenTag.textContent='WHEN: late (>180s)';
+        whenTag.className  ='tag';
+      } else {
+        whenTag.textContent='WHEN: wait for 70–130s';
+        whenTag.className  ='tag';
+        if(isBet){
+          decisionPanel.className = final.includes('UP')?'decisionPanel active-up':'decisionPanel active-down';
+        }
+      }
+
+      actionText=final;
+      const bl=bandFromConf(candle.lockConf);
+      bandTag.textContent='BAND: '+bl.label;
+      bandTag.className  ='tag '+(isBet?(final.includes('UP')?'good':'bad'):'warn');
+
+      if(final.includes('BET UP'))   decisionBig.style.color='var(--good)';
+      else if(final.includes('BET DOWN')) decisionBig.style.color='var(--bad)';
+      else                               decisionBig.style.color='var(--warn)';
+    }
+
+    decisionBig.textContent = actionText;
+    $('winV').textContent   = candle.locked?'LOCKED':'UNLOCKED';
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  PRICE FEED
+  // ═══════════════════════════════════════════════════════
+  function onNewPrice(px, t){
+    lastPrice   = px;
+    lastPriceMs = t;
+    if(t-lastSampleInsertMs>=MIN_SAMPLE_GAP){
+      samples.push({t,p:px});
+      lastSampleInsertMs=t;
+      ensureCandle();
+    }
+    render();
+  }
+
+  // Coinbase Advanced Trade public WS (no auth needed for ticker)
+  function startWS(){
+    stopWS();
+    try{
+      ws = new WebSocket('wss://advanced-trade-ws.coinbase.com');
+      wsHealthy=false;
+
+      ws.onopen=()=>{
+        wsHealthy=true;
+        ws.send(JSON.stringify({
+          type:'subscribe',
+          product_ids:['BTC-USD'],
+          channel:'ticker'
+        }));
+        log('WS connected (Coinbase Advanced Trade)');
+      };
+
+      ws.onmessage=ev=>{
+        wsLastMsgMs=Date.now();
+        let msg; try{ msg=JSON.parse(ev.data); }catch{ return; }
+        // Advanced Trade WS wraps events in events array
+        const events = msg?.events || [];
+        for(const ev of events){
+          const tickers = ev?.tickers || [];
+          for(const tk of tickers){
+            const px=Number(tk?.price);
+            if(Number.isFinite(px)) onNewPrice(px,Date.now());
+          }
+        }
+      };
+
+      ws.onclose=()=>{ wsHealthy=false; log('WS closed (REST fallback active)'); };
+      ws.onerror=()=>{ wsHealthy=false; log('WS error (REST fallback active)'); };
+    }catch{
+      wsHealthy=false;
+    }
+  }
+
+  function stopWS(){
+    if(ws){ try{ ws.close(); }catch{} ws=null; }
+    wsHealthy=false;
+  }
+
+  async function restTick(){
+    if(!running) return;
+    if(wsHealthy && Date.now()-wsLastMsgMs<2500) return; // WS is healthy, skip REST
+    try{
+      const r=await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot',{cache:'no-store'});
+      if(!r.ok) return;
+      const j=await r.json();
+      const px=Number(j?.data?.amount);
+      if(Number.isFinite(px)) onNewPrice(px,Date.now());
+    }catch{}
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  SAKURA PETALS
+  // ═══════════════════════════════════════════════════════
+  const canvas=document.getElementById('petals');
+  const ctx=canvas.getContext('2d');
+  let petals=[];
+  function resize(){
+    const dpr=devicePixelRatio||1;
+    canvas.width =Math.floor(window.innerWidth*dpr);
+    canvas.height=Math.floor(window.innerHeight*dpr);
+    canvas.style.width =window.innerWidth+'px';
+    canvas.style.height=window.innerHeight+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize',resize); resize();
+
+  function rand(a,b){ return a+Math.random()*(b-a); }
+  function newPetal(){
+    return {
+      x:rand(-40,window.innerWidth+40), y:rand(-120,-20),
+      size:rand(7,16), speed:rand(0.6,1.6), drift:rand(-0.5,0.7),
+      rot:rand(0,Math.PI*2), rotSpd:rand(-0.02,0.02),
+      sway:rand(0.6,1.4), hue:rand(330,360), alpha:rand(0.25,0.6),
+      phase:rand(0,Math.PI*2)
+    };
+  }
+  function initPetals(){
+    const n=Math.min(80,Math.max(28,Math.floor(window.innerWidth*window.innerHeight/22000)));
+    petals=Array.from({length:n},()=>{ const p=newPetal(); p.y=rand(-window.innerHeight,window.innerHeight); return p; });
+  }
+  initPetals();
+
+  function drawPetal(p){
+    ctx.save();
+    ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+    const s=p.size;
+    const g=ctx.createRadialGradient(-s*.15,-s*.1,1,0,0,s*1.2);
+    g.addColorStop(0,`hsla(${p.hue},85%,86%,${p.alpha})`);
+    g.addColorStop(1,`hsla(${p.hue-10},75%,70%,${p.alpha*.55})`);
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(0,-s*.9);
+    ctx.bezierCurveTo( s*.8,-s*.6, s*.9,s*.25,0,s*.9);
+    ctx.bezierCurveTo(-s*.9, s*.25,-s*.8,-s*.6,0,-s*.9);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=`rgba(255,255,255,${p.alpha*.18})`; ctx.lineWidth=1; ctx.stroke();
+    ctx.restore();
+  }
+
+  (function animatePetals(){
+    ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+    for(const p of petals){
+      p.phase+=0.02*p.sway;
+      p.x+=p.drift+Math.sin(p.phase)*0.6;
+      p.y+=p.speed;
+      p.rot+=p.rotSpd;
+      drawPetal(p);
+      if(p.y>window.innerHeight+80) Object.assign(p,newPetal());
+    }
+    requestAnimationFrame(animatePetals);
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  //  CONTROLS
+  // ═══════════════════════════════════════════════════════
+  let restInterval=null;
+
+  toggleBtn.addEventListener('click',()=>{
+    running=!running;
+    toggleBtn.textContent=running?'Stop':'Start';
+    if(running){
+      startWS();
+      restTick();
+      restInterval=setInterval(restTick,1000);
+      log('Started');
+    } else {
+      clearInterval(restInterval); restInterval=null;
+      stopWS();
+      log('Stopped');
+    }
+  });
+
+  $('resetBtn').addEventListener('click',()=>{
+    stats=emptyStats(); saveStats(); updatePerfUI(); log('STATS RESET');
+  });
+
+  // Init
+  updatePerfUI();
+  render();
+})();
+</script>
+</body>
+</html>
